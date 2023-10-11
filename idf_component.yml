@@ -1,0 +1,5 @@
+version: "1.0.0"
+description: C++ RTTTL player as an ESP-IDF component
+url: https://github.com/h2zero/ESP32-RTTTL
+dependencies:
+  idf: ">=5.0"

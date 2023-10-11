@@ -1,19 +1,38 @@
 /*
  * RTTTL library to run on ESP32
  * ported from https://github.com/end2endzone/NonBlockingRTTTL
- *
- * using ledc functionality of Arduino ESP32
  */
 
-#include "Arduino.h"
 #include "RTTTL.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-RTTTL::RTTTL(const byte pin, const int channel) {
+
+RTTTL::RTTTL(const gpio_num_t pin, const ledc_channel_t channel, const ledc_timer_t timer) {
   this->pin = pin;
   this->channel = channel;
+  this->timer = timer;
 
-  ledcSetup(channel, 1000, 10); // resolution always seems to be 10bit, no matter what is given
-  ledcAttachPin(pin, channel);
+  ledc_timer_config_t ledc_timer = {
+      .speed_mode       = LEDC_LOW_SPEED_MODE,
+      .duty_resolution  = LEDC_TIMER_10_BIT,
+      .timer_num        = timer,
+      .freq_hz          = 2093,
+      .clk_cfg          = LEDC_AUTO_CLK
+  };
+  ledc_timer_config(&ledc_timer);
+
+  ledc_channel_config_t ledc_channel = {
+      .gpio_num       = pin,
+      .speed_mode     = LEDC_LOW_SPEED_MODE,
+      .channel        = channel,
+      .intr_type      = LEDC_INTR_DISABLE,
+      .timer_sel      = timer,
+      .duty           = 0,
+      .hpoint         = 0,
+      .flags          = {0}
+  };
+  ledc_channel_config(&ledc_channel);
 }
 
 void RTTTL::loadSong(const char *song) {
@@ -73,20 +92,31 @@ void RTTTL::loadSong(const char *song, const int volume) {
 }
 
 void RTTTL::noTone() {
-  ledcWrite(channel, 0);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, 0);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
 }
 
-void RTTTL::tone(int frq, int duration) {
-  ledcWriteTone(channel, frq);
-  ledcWrite(channel, volume);
-  delay(duration);
+void RTTTL::tone(uint32_t freq, uint32_t duration) {
+  ledc_timer_config_t ledc_timer = {
+      .speed_mode       = LEDC_LOW_SPEED_MODE,
+      .duty_resolution  = LEDC_TIMER_10_BIT,
+      .timer_num        = this->timer,
+      .freq_hz          = freq,
+      .clk_cfg          = LEDC_AUTO_CLK
+  };
+  ledc_timer_config(&ledc_timer);
+
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, 512);
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
+
+  vTaskDelay(pdMS_TO_TICKS(duration));
 }
 
 
 void RTTTL::nextNote() {
   long duration;
-  byte note;
-  byte scale;
+  uint8_t note;
+  uint8_t scale;
 
   //stop current note
   noTone();

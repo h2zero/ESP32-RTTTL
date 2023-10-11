@@ -1,6 +1,10 @@
 #ifndef RTTTL_h
 #define RTTTL_h
 
+#include <driver/gpio.h>
+#include <driver/ledc.h>
+#include <esp_timer.h>
+
 #define NOTE_H   0
 #define NOTE_B0  31
 #define NOTE_C1  33
@@ -106,22 +110,25 @@ private:
 
   const char * buffer = "";
   int bufferIndex = -32760;
-  byte defaultDur = 4;
-  byte defaultOct = 5;
+  uint8_t defaultDur = 4;
+  uint8_t defaultOct = 5;
   int bpm = 63;
   long wholenote;
-  byte pin = -1;
+  gpio_num_t pin = GPIO_NUM_MAX;
   unsigned long noteDelay = 0; //m will always be after which means the last note is done playing
   bool playing = false;
-  int channel = 0;
+  ledc_channel_t channel = LEDC_CHANNEL_0;
   int volume = 10;
+  ledc_timer_t timer = LEDC_TIMER_0;
 
   void nextNote();
   void noTone();
-  void tone(int frq, int duration);
+  void tone(uint32_t frq, uint32_t duration);
+  bool isdigit(char c) { return (c >= '0') and (c <= '9'); }
+  unsigned long millis() { return (unsigned long) (esp_timer_get_time() / 1000ULL); }
 
 public:
-  RTTTL(const byte pin, const int channel);
+  RTTTL(const gpio_num_t pin, const ledc_channel_t channel = LEDC_CHANNEL_0, const ledc_timer_t timer = LEDC_TIMER_0);
   void loadSong(const char *song);
   void loadSong(const char *song, const int volume);
   void play();
