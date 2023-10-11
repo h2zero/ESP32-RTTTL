@@ -7,6 +7,18 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+static TaskHandle_t rtttlTaskHandle;
+
+void rtttlTask(void *param) {
+  RTTTL *rtttl = (RTTTL*)param;
+
+  while(true) {
+    xTaskNotifyWait(pdFALSE, ULONG_MAX, nullptr, portMAX_DELAY);
+    while (rtttl->isPlaying()) {
+      rtttl->continuePlaying();
+    }
+  }
+}
 
 RTTTL::RTTTL(const gpio_num_t pin, const ledc_channel_t channel, const ledc_timer_t timer) {
   this->pin = pin;
@@ -33,6 +45,8 @@ RTTTL::RTTTL(const gpio_num_t pin, const ledc_channel_t channel, const ledc_time
       .flags          = {0}
   };
   ledc_channel_config(&ledc_channel);
+
+  xTaskCreatePinnedToCore(rtttlTask, "rtttlTask", 4096, this, 1, &rtttlTaskHandle, 1);
 }
 
 void RTTTL::loadSong(const char *song) {
@@ -44,7 +58,6 @@ void RTTTL::loadSong(const char *song, const int volume) {
   defaultDur = 4;
   defaultOct = 6;
   bpm = 63;
-  playing = true;
   noteDelay = 0;
   this->volume = volume;
 
@@ -89,6 +102,7 @@ void RTTTL::loadSong(const char *song, const int volume) {
 
   // BPM = number of quarter notes per minute
   wholenote = (60 * 1000L / bpm) * 2;  // this is the time for whole note (in milliseconds)
+  songStart = buffer;
 }
 
 void RTTTL::noTone() {
@@ -195,41 +209,47 @@ void RTTTL::nextNote() {
   }
 }
 
-void RTTTL::play() {
+bool RTTTL::play() {
+  if (songStart != nullptr) {
+    xTaskNotifyGive(rtttlTaskHandle);
+    playing = true;
+    return true;
+  }
+
+  return false;
+}
+
+bool RTTTL::continuePlaying() {
   // if done playing the song, return
   if (!playing) {
-    return;
+    return false;
   }
 
   // are we still playing a note ?
   unsigned long m = millis();
   if (m < noteDelay) {
     // wait until the note is completed
-    return;
+    return true;
   }
 
   //ready to play the next note
   if (*buffer == '\0') {
     // no more notes. Reached the end of the last note
 
-    stop();
-    return; //end of the song
-  } else {
-    // more notes to play...
-    nextNote();
+    stop(); //end of the song
+    return false;
   }
+  // more notes to play...
+  nextNote();
+  return true;
 }
 
 void RTTTL::stop() {
   if (playing) {
-    // increase song buffer until the end
-    while (*buffer != '\0') {
-      buffer++;
-    }
-
-    noTone();
-
     playing = false;
+    noTone();
+    // reset to beginning of the song
+    buffer = songStart;
   }
 }
 

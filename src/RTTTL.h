@@ -108,7 +108,8 @@ private:
     NOTE_C7, NOTE_CS7, NOTE_D7, NOTE_DS7, NOTE_E7, NOTE_F7, NOTE_FS7, NOTE_G7, NOTE_GS7, NOTE_A7, NOTE_AS7, NOTE_B7
   };
 
-  const char * buffer = "";
+  const char * buffer = nullptr;
+  const char * songStart = nullptr;
   int bufferIndex = -32760;
   uint8_t defaultDur = 4;
   uint8_t defaultOct = 5;
@@ -131,11 +132,11 @@ public:
   RTTTL(const gpio_num_t pin, const ledc_channel_t channel = LEDC_CHANNEL_0, const ledc_timer_t timer = LEDC_TIMER_0);
   void loadSong(const char *song);
   void loadSong(const char *song, const int volume);
-  void play();
+  bool play();
   void stop();
   bool isPlaying();
   bool done();
-
+  bool continuePlaying();
 };
 
 #endif
