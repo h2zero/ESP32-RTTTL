@@ -124,6 +124,10 @@ void RTTTL::tone(uint32_t freq, uint32_t duration) {
   ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
 
   vTaskDelay(pdMS_TO_TICKS(duration));
+  // If play was stopped while task delayed make sure the tone stops.
+  if (!playing) {
+    noTone();
+  }
 }
 
 
